@@ -9,10 +9,15 @@
 #include <PushButton.h>
 
 // time between screen refreshes in seconds
+#define DISPLAY_NUMBER_OF_COLUMNS 20
+#define DISPLAY_NUMBER_OF_ROWS 4
 #define TIME_BETWEEN_TEMP_DISPLAY 3
 #define DEG_CHAR (char)223
 
+#define FURANCE_OFF 0
+#define MINUMUM_FURANCE_RUN 60*30     // minumum run for furnance is 30min
 #define NO_TARGET_TEMPERATURE -1
+#define START_TARGET_TEMPERATURE 16   // start temperature for setting target is 16deg
 #define DISPLAYED_TEMPERATURE 1
 #define DISPLAYED_TARGET_TEMPERATURE 2
 
@@ -24,7 +29,8 @@ class Thermostat {
   PushButton left_button;
 
   time_t last_temp_display = 0;
-  int target_temperature = -1;
+  time_t furnance_on_at = FURANCE_OFF;
+  short target_temperature = NO_TARGET_TEMPERATURE;
   unsigned int last_displayed = 0;
 
 public:
@@ -45,7 +51,7 @@ public:
     if(this->up_button.pressed()) {
       Serial.println("up button pressed");
       if(this->target_temperature == NO_TARGET_TEMPERATURE) {
-        this->target_temperature = 16;
+        this->target_temperature = START_TARGET_TEMPERATURE;
       } else {
         this->target_temperature += 1;
       }
@@ -55,7 +61,7 @@ public:
     if(this->down_button.pressed()) {
       Serial.println("down button pressed");
       if(this->target_temperature == NO_TARGET_TEMPERATURE) {
-        this->target_temperature = 16;
+        this->target_temperature = START_TARGET_TEMPERATURE;
       } else {
         this->target_temperature -= 1;
       }
@@ -77,7 +83,7 @@ public:
 private:
   void initLcd() {
     Serial.println("here in initlcd");
-    this->display.begin(20,4);
+    this->display.begin(DISPLAY_NUMBER_OF_COLUMNS, DISPLAY_NUMBER_OF_ROWS);
     // ------- Quick 3 blinks of backlight  -------------
     for(int i = 0; i< 3; i++)
     {
