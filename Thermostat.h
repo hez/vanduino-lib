@@ -23,7 +23,7 @@ class Thermostat {
   PushButton down_button;
   PushButton left_button;
 
-  unsigned long last_temp_display = 0;
+  time_t last_temp_display = 0;
   int target_temperature = -1;
   unsigned int last_displayed = 0;
 
