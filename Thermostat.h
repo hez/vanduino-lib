@@ -15,7 +15,7 @@
 #define DEG_CHAR (char)223
 
 #define FURANCE_OFF 0
-#define MINUMUM_FURANCE_RUN 60*30     // minumum run for furnance is 30min
+#define MINUMUM_FURANCE_RUN 60//*30     // minumum run for furnance is 30min
 #define NO_TARGET_TEMPERATURE -1
 #define START_TARGET_TEMPERATURE 16   // start temperature for setting target is 16deg
 #define DISPLAYED_TEMPERATURE 1
@@ -56,6 +56,7 @@ public:
         this->target_temperature += 1;
       }
       this->last_temp_display = cur_timestamp; // reset temp display
+      ensureFurnaceStarted(cur_timestamp);
       displayTargetTemperature();
     }
     if(this->down_button.pressed()) {
@@ -66,6 +67,7 @@ public:
         this->target_temperature -= 1;
       }
       this->last_temp_display = cur_timestamp; // reset temp display
+      ensureFurnaceStarted(cur_timestamp);
       displayTargetTemperature();
     }
     if(this->left_button.pressed()) {
@@ -78,6 +80,8 @@ public:
       this->last_temp_display = cur_timestamp;
       displayTemperature();
     }
+
+    furnaceShutdown(cur_timestamp);
   }
 
 private:
@@ -103,6 +107,27 @@ private:
     up_button.init();
   };
 
+  void ensureFurnaceStarted(time_t current_time) {
+    if(this->furnance_on_at == FURANCE_OFF) {
+      Serial.print("furance turned on at: ");
+      Serial.print(current_time);
+      Serial.println();
+      this->furnance_on_at = current_time;
+    }
+  };
+
+  void furnaceShutdown(time_t current_time) {
+    // Only try shutting down if furance is actually running.
+    if(this->furnance_on_at == FURANCE_OFF)
+      return;
+
+    // Shut down furance if no target temperature and has ran long enough
+    if(this->target_temperature == NO_TARGET_TEMPERATURE && current_time - this->furnance_on_at > MINUMUM_FURANCE_RUN) {
+      Serial.println("Shutting down furance");
+      this->furnance_on_at = FURANCE_OFF;
+    }
+  };
+
   void displayTemperature() {
     // Do we require a full screen refresh?
     //    Don't do a full screen refresh unless we have to, doing so each time
@@ -114,7 +139,7 @@ private:
       this->display.clear();
       this->display.print("Temperature: ");
     } else {
-      this->display.setCursor(13,0);
+      this->display.setCursor(13, 0);
     }
     this->display.print(round(this->sensor.getTemperature()));
     this->display.print(DEG_CHAR);
@@ -136,11 +161,17 @@ private:
     } else {
       this->display.setCursor(8, 3);
     }
-    if(this->target_temperature == NO_TARGET_TEMPERATURE) {
-      this->display.print("off");
+    if(this->furnance_on_at == FURANCE_OFF) {
+      this->display.print("off       ");
     } else {
-      this->display.print(this->target_temperature);
-      this->display.print(DEG_CHAR);
+      if(this->target_temperature == NO_TARGET_TEMPERATURE) {
+        this->display.print("turning off");
+      } else {
+        this->display.print("on (");
+        this->display.print(this->target_temperature);
+        this->display.print(DEG_CHAR);
+        this->display.print(")  ");
+      }
     }
     // Set last displayed for next go around
     this->last_displayed = DISPLAYED_TEMPERATURE;
