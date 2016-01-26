@@ -33,6 +33,7 @@ class Thermostat {
   time_t last_temp_display = 0;
   time_t furnace_on_at = FURNACE_OFF;
   short target_temperature = NO_TARGET_TEMPERATURE;
+  bool fan_on = false;
   unsigned int last_displayed = 0;
 
 public:
@@ -44,6 +45,7 @@ private:
   void initSensor();
   void initButtons();
   void initRelays();
+  void manageFan();
   void ensureFurnaceStarted(const time_t current_time);
   void furnaceShutdown(const time_t current_time);
   void displayTemperature();

@@ -16,6 +16,7 @@ Thermostat::Thermostat(const int display_address, const int sensor_pin, const in
 
 void Thermostat::loop() {
   const time_t cur_timestamp = now();
+  // Button presses
   if(this->up_button.pressed()) {
 #ifdef DEBUG
     Serial.println("up button pressed");
@@ -50,11 +51,16 @@ void Thermostat::loop() {
     this->last_temp_display = cur_timestamp - TIME_BETWEEN_TEMP_DISPLAY; // reset temp display
   }
 
+  // Main screen display
   if(cur_timestamp - this->last_temp_display >= TIME_BETWEEN_TEMP_DISPLAY) {
     this->last_temp_display = cur_timestamp;
     displayTemperature();
   }
 
+  // Manage the fan
+  manageFan();
+
+  // Check if we should shut down the furnace
   furnaceShutdown(cur_timestamp);
 }
 
@@ -85,6 +91,21 @@ void Thermostat::initButtons() {
 void Thermostat::initRelays() {
   this->furnace_relay.init();
   this->furnace_relay.turn_off();
+}
+
+void Thermostat::manageFan() {
+  if(this->furnace_on_at == FURNACE_OFF || this->target_temperature == NO_TARGET_TEMPERATURE) {
+    this->fan_on = false;
+    return;
+  }
+
+  if(this->target_temperature < round(this->sensor.getTemperature())) {
+    this->fan_on = true;
+  }
+
+  if(this->target_temperature > round(this->sensor.getTemperature()) + 5) {
+    this->fan_on = false;
+  }
 }
 
 void Thermostat::ensureFurnaceStarted(const time_t current_time) {
@@ -120,27 +141,46 @@ void Thermostat::displayTemperature() {
   //    causes noticable flicker as the lcd doesn't redraw that quickly.
   const bool full_display = this->last_displayed != DISPLAYED_TEMPERATURE;
 
-  // First line
-  if(full_display) {
+  if(full_display)
     this->display.clear();
+
+  // 1st line: date/time
+  this->display.setCursor(0, 0);
+  this->display.print(year());
+  this->display.print(F("-"));
+  this->display.print(month());
+  this->display.print(F("-"));
+  this->display.print(day());
+  this->display.print(F(" "));
+  this->display.print(hour());
+  this->display.print(F(":"));
+  const int cur_min = minute();
+  if(cur_min < 10)
+    this->display.print(F("0"));
+  this->display.print(cur_min);
+  this->display.print(F("  "));
+
+  // 2nd line
+  if(full_display) {
+    this->display.setCursor(0, 1);
     this->display.print(F("Temperature: "));
   } else {
-    this->display.setCursor(13, 0);
+    this->display.setCursor(13, 1);
   }
   this->display.print(round(this->sensor.getTemperature()));
   this->display.print(DEG_CHAR);
 
-  // Second line
+  // 3rd line
   if(full_display) {
-    this->display.setCursor(0, 1);
+    this->display.setCursor(0, 2);
     this->display.print(F("Humidity: "));
   } else {
-    this->display.setCursor(10, 1);
+    this->display.setCursor(10, 2);
   }
   this->display.print(round(this->sensor.getHumidity()));
   this->display.print(F("%  "));
 
-  // Fourth line
+  // 4th line
   if(full_display) {
     this->display.setCursor(0, 3);
     this->display.print(F("Heater: "));
@@ -153,12 +193,15 @@ void Thermostat::displayTemperature() {
     if(this->target_temperature == NO_TARGET_TEMPERATURE) {
       this->display.print(F("turning off"));
     } else {
-      this->display.print(F("on ("));
+      this->display.print(F("on "));
       this->display.print(this->target_temperature);
       this->display.print(DEG_CHAR);
-      this->display.print(F(")  "));
+      if(this->fan_on)
+        this->display.print((char)243);
+      this->display.print(F("   "));
     }
   }
+
   // Set last displayed for next go around
   this->last_displayed = DISPLAYED_TEMPERATURE;
 }
