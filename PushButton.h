@@ -9,7 +9,7 @@ class PushButton {
   unsigned long last_read;
 
 public:
-  PushButton(int _pin) {
+  PushButton(const int _pin) {
     this->pin = _pin;
   };
 
@@ -17,8 +17,8 @@ public:
     pinMode(this->pin, INPUT);
   };
 
-  bool pressed() {
-    int current = poll();
+  const bool pressed() {
+    const int current = poll();
     if(current != this->state && current == this->DOWN_STATE) {
       this->state = current;
       return true;
@@ -28,7 +28,7 @@ public:
   };
 
 private:
-  int poll() {
+  const int poll() {
     if(millis() - this->last_read > 200) {
       this->last_read = millis();
       return digitalRead(this->pin);

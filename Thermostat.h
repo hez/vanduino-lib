@@ -36,7 +36,7 @@ class Thermostat {
   unsigned int last_displayed = 0;
 
 public:
-  Thermostat(int display_address, int sensor_pin, int sensor_type) :
+  Thermostat(const int display_address, const int sensor_pin, const int sensor_type) :
       display(display_address, 2, 3, 0, 4, 5, 6, 7, 3, POSITIVE),
       sensor(sensor_pin, sensor_type),
       up_button(13),
@@ -124,7 +124,7 @@ private:
     this->furnace_relay.turn_off();
   };
 
-  void ensureFurnaceStarted(time_t current_time) {
+  void ensureFurnaceStarted(const time_t current_time) {
     if(this->furnace_on_at == FURNACE_OFF) {
 #ifdef DEBUG
       Serial.print("furnace turned on at: ");
@@ -136,7 +136,7 @@ private:
     }
   };
 
-  void furnaceShutdown(time_t current_time) {
+  void furnaceShutdown(const time_t current_time) {
     // Only try shutting down if furnace is actually running.
     if(this->furnace_on_at == FURNACE_OFF)
       return;
@@ -155,12 +155,12 @@ private:
     // Do we require a full screen refresh?
     //    Don't do a full screen refresh unless we have to, doing so each time
     //    causes noticable flicker as the lcd doesn't redraw that quickly.
-    bool full_display = this->last_displayed != DISPLAYED_TEMPERATURE;
+    const bool full_display = this->last_displayed != DISPLAYED_TEMPERATURE;
 
     // First line
     if(full_display) {
       this->display.clear();
-      this->display.print("Temperature: ");
+      this->display.print(F("Temperature: "));
     } else {
       this->display.setCursor(13, 0);
     }
@@ -170,30 +170,30 @@ private:
     // Second line
     if(full_display) {
       this->display.setCursor(0, 1);
-      this->display.print("Humidity: ");
+      this->display.print(F("Humidity: "));
     } else {
       this->display.setCursor(10, 1);
     }
     this->display.print(round(this->sensor.getHumidity()));
-    this->display.print("%  ");
+    this->display.print(F("%  "));
 
     // Fourth line
     if(full_display) {
       this->display.setCursor(0, 3);
-      this->display.print("Heater: ");
+      this->display.print(F("Heater: "));
     } else {
       this->display.setCursor(8, 3);
     }
     if(this->furnace_on_at == FURNACE_OFF) {
-      this->display.print("off        ");
+      this->display.print(F("off        "));
     } else {
       if(this->target_temperature == NO_TARGET_TEMPERATURE) {
-        this->display.print("turning off");
+        this->display.print(F("turning off"));
       } else {
-        this->display.print("on (");
+        this->display.print(F("on ("));
         this->display.print(this->target_temperature);
         this->display.print(DEG_CHAR);
-        this->display.print(")  ");
+        this->display.print(F(")  "));
       }
     }
     // Set last displayed for next go around
@@ -203,7 +203,7 @@ private:
   void displayTargetTemperature() {
     this->display.clear();
     this->display.setCursor(0, 1);
-    this->display.print("Target: ");
+    this->display.print(F("Target: "));
     this->display.print(this->target_temperature);
     this->last_displayed = DISPLAYED_TARGET_TEMPERATURE;
   };
