@@ -7,6 +7,7 @@
 #include <ExtendedDHT.h>
 
 #include <PushButton.h>
+#include <Relay.h>
 
 // time between screen refreshes in seconds
 #define DISPLAY_NUMBER_OF_COLUMNS 20
@@ -14,8 +15,8 @@
 #define TIME_BETWEEN_TEMP_DISPLAY 3
 #define DEG_CHAR (char)223
 
-#define FURANCE_OFF 0
-#define MINUMUM_FURANCE_RUN 60//*30     // minumum run for furnance is 30min
+#define FURNACE_OFF 0
+#define MINUMUM_FURNACE_RUN 60//*30     // minumum run for furnance is 30min
 #define NO_TARGET_TEMPERATURE -1
 #define START_TARGET_TEMPERATURE 16   // start temperature for setting target is 16deg
 #define DISPLAYED_TEMPERATURE 1
@@ -27,9 +28,10 @@ class Thermostat {
   PushButton up_button;
   PushButton down_button;
   PushButton left_button;
+  Relay furnace_relay;
 
   time_t last_temp_display = 0;
-  time_t furnance_on_at = FURANCE_OFF;
+  time_t furnace_on_at = FURNACE_OFF;
   short target_temperature = NO_TARGET_TEMPERATURE;
   unsigned int last_displayed = 0;
 
@@ -39,17 +41,21 @@ public:
       sensor(sensor_pin, sensor_type),
       up_button(13),
       down_button(12),
-      left_button(11)
+      left_button(11),
+      furnace_relay(8)
   {
     initLcd();
     initSensor();
     initButtons();
+    initRelays();
   };
 
   void loop() {
     const time_t cur_timestamp = now();
     if(this->up_button.pressed()) {
+#ifdef DEBUG
       Serial.println("up button pressed");
+#endif
       if(this->target_temperature == NO_TARGET_TEMPERATURE) {
         this->target_temperature = START_TARGET_TEMPERATURE;
       } else {
@@ -60,7 +66,9 @@ public:
       displayTargetTemperature();
     }
     if(this->down_button.pressed()) {
+#ifdef DEBUG
       Serial.println("down button pressed");
+#endif
       if(this->target_temperature == NO_TARGET_TEMPERATURE) {
         this->target_temperature = START_TARGET_TEMPERATURE;
       } else {
@@ -71,7 +79,9 @@ public:
       displayTargetTemperature();
     }
     if(this->left_button.pressed()) {
+#ifdef DEBUG
       Serial.println("left button pressed");
+#endif
       this->target_temperature = NO_TARGET_TEMPERATURE;
       this->last_temp_display = cur_timestamp - TIME_BETWEEN_TEMP_DISPLAY; // reset temp display
     }
@@ -86,7 +96,9 @@ public:
 
 private:
   void initLcd() {
+#ifdef DEBUG
     Serial.println("here in initlcd");
+#endif
     this->display.begin(DISPLAY_NUMBER_OF_COLUMNS, DISPLAY_NUMBER_OF_ROWS);
     // ------- Quick 3 blinks of backlight  -------------
     for(int i = 0; i< 3; i++)
@@ -104,27 +116,38 @@ private:
   };
 
   void initButtons() {
-    up_button.init();
+    this->up_button.init();
+  };
+
+  void initRelays() {
+    this->furnace_relay.init();
+    this->furnace_relay.turn_off();
   };
 
   void ensureFurnaceStarted(time_t current_time) {
-    if(this->furnance_on_at == FURANCE_OFF) {
-      Serial.print("furance turned on at: ");
+    if(this->furnace_on_at == FURNACE_OFF) {
+#ifdef DEBUG
+      Serial.print("furnace turned on at: ");
       Serial.print(current_time);
       Serial.println();
-      this->furnance_on_at = current_time;
+#endif
+      this->furnace_on_at = current_time;
+      this->furnace_relay.turn_on();
     }
   };
 
   void furnaceShutdown(time_t current_time) {
-    // Only try shutting down if furance is actually running.
-    if(this->furnance_on_at == FURANCE_OFF)
+    // Only try shutting down if furnace is actually running.
+    if(this->furnace_on_at == FURNACE_OFF)
       return;
 
-    // Shut down furance if no target temperature and has ran long enough
-    if(this->target_temperature == NO_TARGET_TEMPERATURE && current_time - this->furnance_on_at > MINUMUM_FURANCE_RUN) {
-      Serial.println("Shutting down furance");
-      this->furnance_on_at = FURANCE_OFF;
+    // Shut down furnace if no target temperature and has ran long enough
+    if(this->target_temperature == NO_TARGET_TEMPERATURE && current_time - this->furnace_on_at > MINUMUM_FURNACE_RUN) {
+#ifdef DEBUG
+      Serial.println("Shutting down furnace");
+#endif
+      this->furnace_on_at = FURNACE_OFF;
+      this->furnace_relay.turn_off();
     }
   };
 
@@ -161,8 +184,8 @@ private:
     } else {
       this->display.setCursor(8, 3);
     }
-    if(this->furnance_on_at == FURANCE_OFF) {
-      this->display.print("off       ");
+    if(this->furnace_on_at == FURNACE_OFF) {
+      this->display.print("off        ");
     } else {
       if(this->target_temperature == NO_TARGET_TEMPERATURE) {
         this->display.print("turning off");

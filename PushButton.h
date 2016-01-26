@@ -19,10 +19,6 @@ public:
 
   bool pressed() {
     int current = poll();
-    /*Serial.print("button is "); Serial.print(current);
-    Serial.print(" was "); Serial.print(this->state);
-    Serial.print(" reading from "); Serial.print(this->pin);
-    Serial.println("");*/
     if(current != this->state && current == this->DOWN_STATE) {
       this->state = current;
       return true;
