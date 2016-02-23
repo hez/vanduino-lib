@@ -76,7 +76,7 @@ void Thermostat::loop() {
   manageFan();
 
   // Check if we should shut down the furnace
-  furnaceShutdown(cur_timestamp);
+  furnaceShutdown();
 }
 
 const bool Thermostat::addProgram(ThermostatProgram* program) {
@@ -113,25 +113,25 @@ void Thermostat::manageFan() {
   }
 }
 
-void Thermostat::ensureFurnaceStarted(const time_t current_time) {
+void Thermostat::ensureFurnaceStarted() {
   if(this->furnace_on_at == FURNACE_OFF) {
 #ifdef DEBUG
     Serial.print("furnace turned on at: ");
-    Serial.print(current_time);
+    Serial.print(now());
     Serial.println();
 #endif
-    this->furnace_on_at = current_time;
+    this->furnace_on_at = now();
     this->furnace_relay.turn_on();
   }
 }
 
-void Thermostat::furnaceShutdown(const time_t current_time) {
+void Thermostat::furnaceShutdown() {
   // Only try shutting down if furnace is actually running.
   if(this->furnace_on_at == FURNACE_OFF)
     return;
 
   // Shut down furnace if no target temperature and has ran long enough
-  if(this->target_temperature == NO_TARGET_TEMPERATURE && current_time - this->furnace_on_at > MINUMUM_FURNACE_RUN) {
+  if(this->target_temperature == NO_TARGET_TEMPERATURE && now() - this->furnace_on_at > MINUMUM_FURNACE_RUN) {
 #ifdef DEBUG
     Serial.println("Shutting down furnace");
 #endif

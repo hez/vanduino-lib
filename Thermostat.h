@@ -23,9 +23,6 @@
 #define NO_TARGET_TEMPERATURE -1
 #define NO_SELECTED_PROGRAM -1
 #define START_TARGET_TEMPERATURE 16   // start temperature for setting target is 16deg
-#define DISPLAY_TEMPERATURE 1
-#define DISPLAY_TARGET_TEMPERATURE 2
-#define DISPLAY_CURRENT_PROGRAM 3
 
 class Thermostat {
 public:
@@ -38,36 +35,39 @@ public:
 
   time_t last_temp_display = 0;
   time_t furnace_on_at = FURNACE_OFF;
-  time_t last_button_press = 0;
   short target_temperature = NO_TARGET_TEMPERATURE;
   bool fan_on = false;
-  unsigned short current_screen = 0;
 
   Thermostat(const int sensor_pin, const int sensor_type);
   void loop();
+  void ensureFurnaceStarted();
+  void furnaceShutdown();
+
+  const bool no_target_temperature() {
+    return target_temperature == NO_TARGET_TEMPERATURE;
+  };
+  void set_target_temperature(const short new_target) {
+    target_temperature = new_target;
+  };
+  const short get_target_temperature() {
+    return target_temperature;
+  };
   const bool addProgram(ThermostatProgram*);
   ThermostatProgram* getProgram(const unsigned int pos) {
     return this->programs[pos];
-  }
+  };
   const unsigned short programCount() {
     for(int i = 0; i < sizeof(this->programs); i++) {
       if(this->programs[i] == NULL)
         return i;
     }
-  }
+  };
 
 private:
   void initSensor();
   void initRelays();
 
   void manageFan();
-
-  void ensureFurnaceStarted(const time_t current_time);
-  void furnaceShutdown(const time_t current_time);
-
-  void registerButtonPress(const time_t current_time) {
-    this->last_button_press = current_time;
-  };
 };
 
 #endif
