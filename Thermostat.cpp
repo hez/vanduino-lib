@@ -1,22 +1,18 @@
 #include <Thermostat.h>
 
-Thermostat::Thermostat(const int display_address, const int sensor_pin, const int sensor_type) :
-    display(display_address, 2, 3, 0, 4, 5, 6, 7, 3, POSITIVE),
+Thermostat::Thermostat(const int sensor_pin, const int sensor_type) :
     sensor(sensor_pin, sensor_type),
-    up_button(13),
-    down_button(12),
-    left_button(11),
     furnace_relay(8)
 {
-  initLcd();
   initSensor();
-  initButtons();
   initRelays();
 }
 
 void Thermostat::loop() {
   const time_t cur_timestamp = now();
+
   // Button presses
+  /*
   if(this->up_button.pressed()) {
 #ifdef DEBUG
     Serial.println("up button pressed");
@@ -27,6 +23,7 @@ void Thermostat::loop() {
       this->target_temperature += 1;
     }
     this->last_temp_display = cur_timestamp; // reset temp display
+    registerButtonPress(cur_timestamp);
     ensureFurnaceStarted(cur_timestamp);
     displayTargetTemperature();
   }
@@ -40,52 +37,60 @@ void Thermostat::loop() {
       this->target_temperature -= 1;
     }
     this->last_temp_display = cur_timestamp; // reset temp display
+    registerButtonPress(cur_timestamp);
     ensureFurnaceStarted(cur_timestamp);
     displayTargetTemperature();
   }
+
   if(this->left_button.pressed()) {
 #ifdef DEBUG
     Serial.println("left button pressed");
 #endif
     this->target_temperature = NO_TARGET_TEMPERATURE;
-    this->last_temp_display = cur_timestamp - TIME_BETWEEN_TEMP_DISPLAY; // reset temp display
+    this->last_temp_display = cur_timestamp - TIME_BETWEEN_TEMP_DISPLAY;
+    registerButtonPress(cur_timestamp);
+  }
+
+  if(this->right_button.pressed()) {
+    this->selected_program += 1;
+    if(this->selected_program >= this->programCount())
+      this->selected_program = 0;
+#ifdef DEBUG
+    Serial.println("right button pressed");
+    Serial.print("Current program: ");
+    Serial.println(this->selected_program);
+#endif
+    this->last_temp_display = cur_timestamp; // reset temp display
+    registerButtonPress(cur_timestamp);
+    displayProgram();
   }
 
   // Main screen display
   if(cur_timestamp - this->last_temp_display >= TIME_BETWEEN_TEMP_DISPLAY) {
     this->last_temp_display = cur_timestamp;
-    displayTemperature();
+    displayTemperature(cur_timestamp);
   }
+  */
 
   // Manage the fan
   manageFan();
 
   // Check if we should shut down the furnace
-  furnaceShutdown(cur_timestamp);
+  furnaceShutdown();
 }
 
-void Thermostat::initLcd() {
-#ifdef DEBUG
-  Serial.println("here in initlcd");
-#endif
-  this->display.begin(DISPLAY_NUMBER_OF_COLUMNS, DISPLAY_NUMBER_OF_ROWS);
-  // ------- Quick 3 blinks of backlight  -------------
-  for(int i = 0; i< 3; i++)
-  {
-    this->display.backlight();
-    delay(150);
-    this->display.noBacklight();
-    delay(150);
+const bool Thermostat::addProgram(ThermostatProgram* program) {
+  for(int i = 0; i < sizeof(this->programs); i++) {
+    if(this->programs[i] == NULL) {
+      this->programs[i] = program;
+      return true;
+    }
   }
-  this->display.backlight(); // finish with backlight on
+  return false;
 }
 
 void Thermostat::initSensor() {
   this->sensor.begin();
-}
-
-void Thermostat::initButtons() {
-  this->up_button.init();
 }
 
 void Thermostat::initRelays() {
@@ -99,34 +104,34 @@ void Thermostat::manageFan() {
     return;
   }
 
-  if(this->target_temperature < round(this->sensor.getTemperature())) {
+  if(this->target_temperature + 3 >= round(this->sensor.getTemperature())) {
     this->fan_on = true;
   }
 
-  if(this->target_temperature > round(this->sensor.getTemperature()) + 5) {
+  if(this->target_temperature < round(this->sensor.getTemperature())) {
     this->fan_on = false;
   }
 }
 
-void Thermostat::ensureFurnaceStarted(const time_t current_time) {
+void Thermostat::ensureFurnaceStarted() {
   if(this->furnace_on_at == FURNACE_OFF) {
 #ifdef DEBUG
     Serial.print("furnace turned on at: ");
-    Serial.print(current_time);
+    Serial.print(now());
     Serial.println();
 #endif
-    this->furnace_on_at = current_time;
+    this->furnace_on_at = now();
     this->furnace_relay.turn_on();
   }
 }
 
-void Thermostat::furnaceShutdown(const time_t current_time) {
+void Thermostat::furnaceShutdown() {
   // Only try shutting down if furnace is actually running.
   if(this->furnace_on_at == FURNACE_OFF)
     return;
 
   // Shut down furnace if no target temperature and has ran long enough
-  if(this->target_temperature == NO_TARGET_TEMPERATURE && current_time - this->furnace_on_at > MINUMUM_FURNACE_RUN) {
+  if(this->target_temperature == NO_TARGET_TEMPERATURE && now() - this->furnace_on_at > MINUMUM_FURNACE_RUN) {
 #ifdef DEBUG
     Serial.println("Shutting down furnace");
 #endif
@@ -135,30 +140,24 @@ void Thermostat::furnaceShutdown(const time_t current_time) {
   }
 }
 
-void Thermostat::displayTemperature() {
+/*
+void Thermostat::displayTemperature(const time_t current_time) {
   // Do we require a full screen refresh?
   //    Don't do a full screen refresh unless we have to, doing so each time
   //    causes noticable flicker as the lcd doesn't redraw that quickly.
-  const bool full_display = this->last_displayed != DISPLAYED_TEMPERATURE;
+  const bool full_display = this->current_screen != DISPLAY_TEMPERATURE;
+#ifdef ALWAYS_FETCH_TEMPERATURES
+  const bool allow_temp_fetch = true;
+#else
+  const bool allow_temp_fetch = current_time - this->last_button_press >= TIME_FOR_BUTTON_PRESSES;
+#endif
 
   if(full_display)
     this->display.clear();
 
   // 1st line: date/time
   this->display.setCursor(0, 0);
-  this->display.print(year());
-  this->display.print(F("-"));
-  this->display.print(month());
-  this->display.print(F("-"));
-  this->display.print(day());
-  this->display.print(F(" "));
-  this->display.print(hour());
-  this->display.print(F(":"));
-  const int cur_min = minute();
-  if(cur_min < 10)
-    this->display.print(F("0"));
-  this->display.print(cur_min);
-  this->display.print(F("  "));
+  this->displayDateTime();
 
   // 2nd line
   if(full_display) {
@@ -167,7 +166,7 @@ void Thermostat::displayTemperature() {
   } else {
     this->display.setCursor(13, 1);
   }
-  this->display.print(round(this->sensor.getTemperature()));
+  this->display.print(round(this->sensor.getTemperature(allow_temp_fetch)));
   this->display.print(DEG_CHAR);
 
   // 3rd line
@@ -177,7 +176,7 @@ void Thermostat::displayTemperature() {
   } else {
     this->display.setCursor(10, 2);
   }
-  this->display.print(round(this->sensor.getHumidity()));
+  this->display.print(round(this->sensor.getHumidity(allow_temp_fetch)));
   this->display.print(F("%  "));
 
   // 4th line
@@ -187,7 +186,10 @@ void Thermostat::displayTemperature() {
   } else {
     this->display.setCursor(8, 3);
   }
-  if(this->furnace_on_at == FURNACE_OFF) {
+  // Are we running a program?
+  if(this->current_running != NULL) {
+    this->display.print(this->current_running->getName());
+  } else if(this->furnace_on_at == FURNACE_OFF) {
     this->display.print(F("off        "));
   } else {
     if(this->target_temperature == NO_TARGET_TEMPERATURE) {
@@ -203,7 +205,26 @@ void Thermostat::displayTemperature() {
   }
 
   // Set last displayed for next go around
-  this->last_displayed = DISPLAYED_TEMPERATURE;
+  this->current_screen = DISPLAY_TEMPERATURE;
+}
+
+void Thermostat::displayDateTime() {
+  const int cur_min = minute();
+
+  this->display.print(year());
+  this->display.print(F("-"));
+  this->display.print(month());
+  this->display.print(F("-"));
+  this->display.print(day());
+  this->display.print(F(" "));
+  this->display.print(hour());
+  this->display.print(F(":"));
+
+  if(cur_min < 10)
+    this->display.print(F("0"));
+
+  this->display.print(cur_min);
+  this->display.print(F("  "));
 }
 
 void Thermostat::displayTargetTemperature() {
@@ -211,5 +232,22 @@ void Thermostat::displayTargetTemperature() {
   this->display.setCursor(0, 1);
   this->display.print(F("Target: "));
   this->display.print(this->target_temperature);
-  this->last_displayed = DISPLAYED_TARGET_TEMPERATURE;
-};
+  this->current_screen = DISPLAY_TARGET_TEMPERATURE;
+}
+
+void Thermostat::displayProgram() {
+  ThermostatProgram* program = this->programs[this->selected_program];
+  this->display.clear();
+  this->display.setCursor(0, 0);
+  this->display.print(F("Program: "));
+  this->display.print(this->selected_program + 1);
+  this->display.print(F("/"));
+  this->display.print(this->programCount());
+  this->display.setCursor(0, 1);
+  this->display.print(program->getName());
+  this->display.setCursor(0, 2);
+  this->display.print(program->getTarget());
+  this->display.print(DEG_CHAR);
+  this->current_screen = DISPLAY_CURRENT_PROGRAM;
+}
+*/
