@@ -3,7 +3,7 @@
 #include <Wire.h>
 
 class PushButton {
-  static const int DOWN_STATE = 0x1;
+  static const int DOWN_STATE = 0x0;
   int state = 0x1;
   int pin;
   unsigned long last_read;
@@ -19,7 +19,8 @@ public:
 
   const bool pressed() {
     const int current = poll();
-    if(current != this->state && current == this->DOWN_STATE) {
+    // transition from down to up
+    if(current != this->state && current != this->DOWN_STATE) {
       this->state = current;
       return true;
     }
